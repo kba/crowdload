@@ -1,0 +1,57 @@
+// - vim: noexpandtab list ts=4 sw=4 :
+html
+	head
+		title Crowdload
+		link(rel="stylesheet", href="vendor/bootstrap/css/bootstrap.css")
+		//- link(rel="stylesheet", href="vendor/bootstrap/css/bootstrap-theme.css")
+		style(type="text/css") .userscript { display: none }
+	body
+		.container
+			.row
+				.col.col-md-12
+					h1 Crowdloader
+					#no-userscript.alert.alert-danger
+						p You need to install/enable the #[a(href="crowdload.userscripts.js") userscript].
+			.row.userscript
+				.status
+					for status in statuses
+						span #{status}: 
+								code(id="status-#{status}")
+			.row.userscript
+				.col.col-md-2
+					#controls-container
+						button.btn.btn-default.btn-success.start Start
+						button.btn.btn-default.btn-danger.stop Stop
+				.col.col-md-10
+					#download
+						h2 Download
+						div
+							span URI
+							code.uri --
+							span Downloaded 
+							code.bytesDownloaded --
+							span Total 
+							code.totalSize --
+						.progress
+							.progress-bar(
+								role="progressbar",
+								aria-valuenow="0",
+								aria-valuemin="0",
+								aria-valuemax="100",
+								style="width: 0%;")
+					#upload
+						h2 Upload
+						div
+							span URI
+							code.uri --
+							span Uploaded 
+							code.bytesUploaded --
+							span Total 
+							code.totalSize --
+						.progress
+							.progress-bar(
+								role="progressbar",
+								aria-valuenow="0",
+								aria-valuemin="0",
+								aria-valuemax="100",
+								style="width: 0%;")

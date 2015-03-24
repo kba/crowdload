@@ -31,3 +31,4 @@ apidocs/
 lib/
 *nedb
 *csv
+public/vendor

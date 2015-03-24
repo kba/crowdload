@@ -19,6 +19,7 @@ db =  {
 
 STATUS = {
 	'QUEUED'
+	'TIMED_OUT'
 	'ACCEPTED'
 	'FINISHED'
 }
@@ -32,7 +33,30 @@ app.use (req, res, next) ->
 		req.text = string
 		next()
 
+app.use(Express.static('public'))
+app.set('views', './templates')
+app.set('view engine', 'jade')
+
 # app.use(BodyParser.json())
+
+#############################################
+#
+# Web interface
+#
+#############################################
+
+app.get '/', (req, res, next) ->
+		res.render 'index', {
+			statuses: Object.keys(STATUS)
+		}
+
+
+
+#############################################
+#
+# api
+#
+#############################################
 
 app.post '/queue', (req, res, next) ->
 	newURI = req.query.uri
@@ -60,6 +84,8 @@ app.put '/upload', (req, res, next) ->
 			next err
 		else
 			base64 = req.text.toString('base64')
+			console.log req.headers
+			console.log("PDF is #{base64.length} bytes long");
 			patch = {
 				'$set': {
 					base64: base64
@@ -76,16 +102,15 @@ app.put '/upload', (req, res, next) ->
 					res.end()
 
 app.get '/queue', (req, res, next) ->
-	newURI = req.query.uri
-	db.files.find {}, (err, docs) ->
-		if err
-			res.status 400
-			next err
-		else
-			res.status 200
-			res.send docs
+	counts = {}
+	Async.each Object.keys(STATUS), (status, cb) ->
+		db.files.count {status:status}, (err, count) ->
+			counts[status] = count
+			cb()
+	, (err) -> 
+		res.send counts
 
-app.get '/queue/pop', (req, res, next) ->
+app.post '/queue/pop', (req, res, next) ->
 	db.files.findOne {status: STATUS.QUEUED}, (err, doc) ->
 		if err
 			res.status 400
