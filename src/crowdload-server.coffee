@@ -5,13 +5,14 @@
 
 'use strict'
 
-Async      = require 'async'
-Express    = require 'express'
-BodyParser = require 'body-parser'
-SocketIO   = require 'socket.io'
-RawBody    = require 'raw-body'
-Nedb       = require 'nedb'
-MediaTyper = require 'media-typer'
+Async       = require 'async'
+Express     = require 'express'
+BodyParser  = require 'body-parser'
+SocketIO    = require 'socket.io'
+RawBody     = require 'raw-body'
+Nedb        = require 'nedb'
+MediaTyper  = require 'media-typer'
+Compression = require 'compression'
 
 db =  {
 	files: new Nedb(filename: './crowdload.nedb', autoload: true)
@@ -36,6 +37,7 @@ app.use (req, res, next) ->
 app.use(Express.static('public'))
 app.set('views', './templates')
 app.set('view engine', 'jade')
+app.use(Compression())
 
 # app.use(BodyParser.json())
 
