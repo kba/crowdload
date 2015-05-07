@@ -12,56 +12,43 @@ html
 					h1 Crowdloader
 					#no-userscript.alert.alert-danger
 						p You need to install/enable the #[a(href="Crowdload.user.js") userscript].
-				.col-sm-3.userscript
+				.col-sm-2.userscript
 					.panel.panel-default#controls-container
-						.panel-body
+						.panel-body(style='text-align:center')
 							button.btn.btn-default.btn-success.start Start
 							button.btn.btn-default.btn-danger.stop Stop
+
 			.row.userscript
 				.col-sm-12
-
-					.panel.panel-default#download
-						.panel-heading Download
-						.panel-body
-							div
-								span URI
-								span.text.text-info.uri --
-								span Downloaded 
-								span.text.text-info.bytesDownloaded --
-								span Total 
-								span.text.text-info.totalSize --
-							.progress
-								.progress-bar.progress-bar-success(
-									role="progressbar",
-									aria-valuenow="0",
-									aria-valuemin="0",
-									aria-valuemax="100",
-									style="width: 0%;")
-
-					.panel.panel-default#upload
-						.panel-heading Upload
-						.panel-body
-							div
-								span URI
-								span.text.text-info.uri --
-								span Uploaded 
-								span.text.text-info.bytesUploaded --
-								span Total
-								span.text.text-info.totalSize --
-							.progress
-								.progress-bar.progress-bar-danger(
-									role="progressbar",
-									aria-valuenow="0",
-									aria-valuemin="0",
-									aria-valuemax="100",
-									style="width: 0%;")
+					for which in ["Download", "Upload"]
+						.panel.panel-default(id=which)
+							.panel-heading #{which}
+							.panel-body
+								div
+									span URI
+									span.text.text-info.uri --
+									span Loaded
+									span.text.text-info.loaded --
+									span Total 
+									span.text.text-info.total --
+								.progress
+									.progress-bar.progress-bar-success(
+										role="progressbar",
+										aria-valuenow="0",
+										aria-valuemin="0",
+										aria-valuemax="100",
+										style="width: 0%;")
 
 			.row.userscript
-				.col-sm-3
+				.col-sm-4
 					.panel.panel-default
 						.panel-heading Client stats
 						.panel-body.status
 							table.table.table-condensed
+								tr
+									th(scope="row") User Name:
+									td
+										span.text-info.client-user-name --
 								tr
 									th(scope="row") State:
 									td
@@ -78,9 +65,10 @@ html
 									th Bytes Retrieved
 									td
 										span.text-info.client-bytes-retrieved -1
-				.col-sm-3
+				.col-sm-4
 					.panel.panel-default
 						.panel-heading Server-wide stats
+							button.btn.btn-xs.btn-default.pull-right.refresh-stats Refresh
 						.panel-body.server-status
 							table.table.table-condensed
 								for status in statuses
@@ -88,3 +76,22 @@ html
 										th(scope="row")= status
 										td
 											span(class="text-info status-#{status}") --
+				.col-sm-4
+					.panel.panel-default
+						.panel-heading Leaderboard
+							button.btn.btn-xs.btn-default.pull-right.refresh-stats Refresh
+						.panel-body#leaderboard
+							table.table.table-condensed
+								thead
+									tr
+										th User
+										th Data
+										th Files
+								tbody
+			.row.userscript
+				.col-sm-12
+					.panel.panel-default
+						.panel-heading History
+							button.btn.btn-xs.btn-default.pull-right.clear-history Clear
+						.panel-body
+							ul#history
