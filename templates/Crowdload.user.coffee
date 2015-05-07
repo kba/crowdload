@@ -85,15 +85,17 @@ class UI
 		$('.btn.refresh-stats').click () -> self.app.updateServerStats()
 		$('.btn.clear-history').click () ->
 			GM_Storage.clearHistory()
-			@update()
+			self.update()
 		@reset()
 	
 	updateServerStats : (cb) ->
 		for k,v of @app.serverStats
 			$('.server-status .status-' + k).html v
 
-		for user,{files,bytes} of @app.leaderboard
-			$('#leaderboard tbody').empty()
+		$('#leaderboard tbody').empty()
+		rankedUsers = [k of @app.leaderboard].sort (a,b) -> a.files > b.files
+		for user in rankedUsers
+			{files,bytes} = @app.leaderboard[user]
 			$('#leaderboard tbody').append """
 			<tr>
 				<th>#{user}</th>
@@ -226,6 +228,9 @@ class App
 				if e.status == 200
 					console.log 'PDF Download successful'
 					form.append("file", new Blob([e.response], {type: e.responseHeaders['Content-Type']}))
+					###
+					###
+					# form.append("file", [e.responseText])
 					success = true
 				else
 					form.append("reason", e.responseText)

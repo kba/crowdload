@@ -6,16 +6,19 @@
 'use strict'
 
 
-Fs       = require 'fs'
-Async    = require 'async'
-Express  = require 'express'
-RawBody  = require 'raw-body'
-Nedb     = require 'nedb'
-Moment   = require 'moment'
-UUID     = require 'uuid'
-{ Form } = require 'multiparty'
-Winston  = require 'winston'
+Fs           = require 'fs'
+FsExtra      = require 'fs-extra'
+Async        = require 'async'
+Express      = require 'express'
+RawBody      = require 'raw-body'
+Nedb         = require 'nedb'
+Moment       = require 'moment'
+Crypto       = require 'crypto'
+UUID         = require 'uuid'
+Multiparty    = require 'multiparty'
+Winston      = require 'winston'
 ChildProcess = require 'child_process'
+Request      = require 'superagent'
 # Compression = require 'compression'
 
 LOG = new (Winston.Logger) {
@@ -35,7 +38,7 @@ LOG = new (Winston.Logger) {
 # The database(s)
 ###
 DB =  {
-	files: new Nedb(filename: './crowdload.nedb', autoload: true)
+	files: new Nedb(filename: "#{__dirname}/../crowdload.nedb", autoload: true)
 }
 
 ###
@@ -44,9 +47,19 @@ DB =  {
 PORT = 2000
 
 ###
+# BASE_URL
+###
+BASE_URL = 'http://www-test.bib.uni-mannheim.de/infolis/crowdload'
+
+###
 # Directory to store the files in
 ###
-SAVE_DIR = './files-retrieved'
+SAVE_DIR = "#{__dirname}/../files-retrieved"
+err = FsExtra.mkdirsSync SAVE_DIR
+if err
+	LOG.error "Couldn't create save file"
+	LOG.error err
+	process.exit 10
 
 ###
 # The status of the download
@@ -108,8 +121,8 @@ app.get '/', (req, res, next) ->
 
 _getUserScriptMeta = (cb) ->
 	Fs.readFile 'templates/Crowdload.meta.js', {encoding:'utf-8'}, (err, meta) ->
-		meta = meta.replace 'CURRENT_DATE', Moment().format('YYYYMMDDhhmmss')
-		meta = meta.replace /BASE_URL/g, 'http://www-test.bib.uni-mannheim.de/infolis/crowdload'
+		meta = meta.replace 'CURRENT_DATE', Moment().format('YYYYMMDDHHmmss')
+		meta = meta.replace /BASE_URL/g, BASE_URL
 		meta = meta.replace /^/g, '// '
 		meta = meta.replace /\n/g, '\n// '
 		return cb meta
@@ -269,7 +282,7 @@ app.put '/upload', (req, res, next) ->
 			res.status 404
 			next "Unknown URI <#{uri}> ."
 		else
-			form = new Form()
+			form = new Multiparty.Form()
 			form.parse req, (err, fields, files) ->
 				if err
 					LOG.error "Unparseable form in request"
@@ -279,19 +292,40 @@ app.put '/upload', (req, res, next) ->
 					res.status 400
 					return next problems
 				entry = _parseEntry(req, fields, files)
-				patch = {'$set': {}}
-				patch['$push'] = {entries: entry}
-				patch['$set'].status = if entry.status == 200 then STATUS.FINISHED else STATUS.FAILED
-				console.log files
-				LOG.debug "About to store entry", entry
-				DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
-					if err
-						res.status 400
-						res.end()
-					else
-						res.status 200
-						console.log nrUpdated
-						res.end()
+
+				# Calculate MD5, store file in SAVE_DIR
+				if entry.status == 200
+					hash = Crypto.createHash 'md5'
+					inFileName = files.file[0].path
+
+					Fs.readFile inFileName, (err, data) ->
+						if err
+							LOG.error "Error retrieving temp file #{inFileName}. HD Full?"
+							LOG.error err
+							res.status 500
+							return next err
+						hash.update(data)
+						md5 = hash.digest('hex')
+
+						outFileName = "#{SAVE_DIR}/#{md5}"
+						Fs.writeFile outFileName, data, (err) ->
+							if err
+								LOG.error "Error writing file #{outFileName}."
+								LOG.error err
+								res.status 500
+								return next err
+
+							LOG.debug "About to store entry", entry
+							patch = {'$set': {}}
+							patch['$push'] = {entries: entry}
+							patch['$set'].status = if entry.status == 200 then STATUS.FINISHED else STATUS.FAILED
+							DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
+								if err
+									res.status 400
+									res.end()
+								else
+									res.status 200
+									res.end()
 
 ###
 # Run the server
