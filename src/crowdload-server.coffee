@@ -49,7 +49,7 @@ PORT = 2000
 ###
 # BASE_URL
 ###
-BASE_URL = 'http://www-test.bib.uni-mannheim.de/infolis/crowdload'
+BASE_URL = 'http://infolis.gesis.org/crowdload'
 
 ###
 # Directory to store the files in
@@ -105,6 +105,11 @@ app.set('view engine', 'jade')
 # app.use(Compression())
 
 # app.use(BodyParser.json())
+#
+
+_getRemote = (req) ->
+	# req.connection.remoteAddress
+	return req.header 'X-Forwarded-For'
 
 ###
 ==========~~~~~~~---- --- -- -  -   -    -
@@ -199,7 +204,7 @@ app.post '/queue/pop', (req, res, next) ->
 			res.status 404
 			res.send 'No more URIs to fetch (for you)'
 		else
-			LOG.debug "Giving URI <#{doc._id}> to user '#{userName}' [#{req.connection.remoteAddress}]"
+			LOG.debug "Giving URI <#{doc._id}> to user '#{userName}' [#{_getRemote(req)}]"
 			patch = '$set': {status: STATUS.ACCEPTED}
 			DB.files.update {_id: doc._id}, patch, (err) ->
 				if err
@@ -209,6 +214,13 @@ app.post '/queue/pop', (req, res, next) ->
 					res.status 200
 					res.send doc._id
 
+###
+# History
+# TODO
+###
+
+# app.get '/history', (req, res, next) ->
+#     DB.files.find({}).sort('entries.
 
 ###
 # Get leaderboard :)
@@ -253,6 +265,8 @@ _validateForm = (fields, files) ->
 			for req in ['reason']
 				if req not of fields
 					problems.push "Missing depending required '#{req}' form field"
+	if not files.file or not files.file.length
+		problems.push 'No file payload'
 	return problems
 
 _parseEntry = (req, fields, files) ->
@@ -261,7 +275,7 @@ _parseEntry = (req, fields, files) ->
 		obj[fieldName] = fields[fieldName][0]
 	obj.date = new Date(obj.date)
 	obj.status = parseInt fields.status
-	obj.ip = req.connection.remoteAddress
+	obj.ip = _getRemote(req)
 	obj.size = files.file[0].size
 	return obj
 
@@ -289,43 +303,50 @@ app.put '/upload', (req, res, next) ->
 					return next "Unparseable form in request"
 				problems = _validateForm(fields, files)
 				if problems.length > 0
-					res.status 400
-					return next problems
+					return DB.files.update {_id: uri}, {'$set': {'status': STATUS.FAILED}}, (err, nrUpdated) ->
+						res.status 400
+						res.end()
+
 				entry = _parseEntry(req, fields, files)
 
 				# Calculate MD5, store file in SAVE_DIR
-				if entry.status == 200
-					hash = Crypto.createHash 'md5'
-					inFileName = files.file[0].path
+				if entry.status isnt 200 or not files.file[0]
+					DB.files.update {_id: uri}, {'$set': {'status': STATUS.FAILED}}, (err, nrUpdated) ->
+						res.status 400
+						res.end()
+				hash = Crypto.createHash 'md5'
+				inFileName = files.file[0].path
 
-					Fs.readFile inFileName, (err, data) ->
+				Fs.readFile inFileName, (err, data) ->
+					if err
+						LOG.error "Error retrieving temp file #{inFileName}. HD Full?"
+						LOG.error err
+						res.status 500
+						return next err
+					hash.update(data)
+					md5 = hash.digest('hex')
+					entry.md5 = md5
+
+					outFileName = "#{SAVE_DIR}/#{md5}"
+					Fs.writeFile outFileName, data, (err) ->
 						if err
-							LOG.error "Error retrieving temp file #{inFileName}. HD Full?"
+							LOG.error "Error writing file #{outFileName}."
 							LOG.error err
 							res.status 500
 							return next err
-						hash.update(data)
-						md5 = hash.digest('hex')
 
-						outFileName = "#{SAVE_DIR}/#{md5}"
-						Fs.writeFile outFileName, data, (err) ->
+						LOG.debug "About to store entry", entry
+						patch = {'$set': {}}
+						patch['$push'] = {entries: entry}
+						patch['$set'].status = STATUS.FINISHED
+						DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
 							if err
-								LOG.error "Error writing file #{outFileName}."
-								LOG.error err
-								res.status 500
-								return next err
+								res.status 400
+								res.end()
+							else
+								res.status 200
+								res.end()
 
-							LOG.debug "About to store entry", entry
-							patch = {'$set': {}}
-							patch['$push'] = {entries: entry}
-							patch['$set'].status = if entry.status == 200 then STATUS.FINISHED else STATUS.FAILED
-							DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
-								if err
-									res.status 400
-									res.end()
-								else
-									res.status 200
-									res.end()
 
 ###
 # Run the server

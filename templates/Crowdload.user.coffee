@@ -17,7 +17,7 @@ STATE = {'STOPPED', 'IDLE', 'DOWNLOADING', 'UPLOADING', 'FINISHED_UPLOADING', 'E
 ###
 # Base URL of the orchestrator
 ###
-CROWDLOAD_BASE = 'http://www-test.bib.uni-mannheim.de/infolis/crowdload'
+CROWDLOAD_BASE = 'http://infolis.gesis.org/crowdload'
 
 ###
 # How many milliseconds to wait between requests
@@ -29,7 +29,9 @@ INTERVAL_WAIT_MS = 30 * 1000
 ###
 INTERVAL_CLIENT_UPDATE_MS = 50
 
+###
 # jQuery-like selector
+###
 $ = Zepto
 
 ###
@@ -47,29 +49,28 @@ humanReadableSize = (bytes) ->
 humanReadableSeconds = (seconds) ->
 	(seconds / 1000.0).toFixed(2) + ' s'
 
+randomDelay = () ->
+	Math.round Math.random() * (40 * 1000)
 
 ###
 # Store data locally in browser
 ###
 class GM_Storage
-	@incFilesCount : ->
-		nrFiles = GM_getValue('nr_Files', 0)
-		return GM_setValue 'nr_Files', nrFiles + 1
-	@incBytes : (d) ->
-		bytes = GM_getValue('bytes', 0 )
-		return GM_setValue 'bytes', bytes + d
-	@getBytes      : -> return GM_getValue('bytes')
-	@getFilesCount : -> return GM_getValue('nr_Files')
-	@getLastURI    : -> return GM_getValue 'last_uri'
-	@setLastURI    : (uri) -> return GM_setValue 'last_uri', uri
-	@getUserName   : -> return GM_getValue('userName')
-	@setUserName   : (name) -> return GM_setValue('userName', name)
-	@getHistory    : -> return JSON.parse GM_getValue('history', '[]')
-	@addToHistory  : (uri) -> 
+	@incFilesCount : -> return localStorage.setItem 'nr_Files', GM_Storage.getFilesCount() + 1
+	@incBytes      : (d) -> return localStorage.setItem 'bytes', GM_Storage.getBytes() + d
+	@getBytes      : -> return parseInt(localStorage.getItem('bytes') or 0)
+	@getFilesCount : -> return parseInt(localStorage.getItem('nr_Files') or 0)
+	@getLastURI    : -> return localStorage.getItem 'last_uri' or '--'
+	@setLastURI    : (uri) -> return localStorage.setItem 'last_uri', uri
+	@getUserName   : -> return localStorage.getItem('userName')
+	@setUserName   : (name) -> return localStorage.setItem('userName', name)
+	@getHistory    : -> return JSON.parse localStorage.getItem('history') or '[]'
+	@addToHistory  : (uri) ->
 		history = GM_Storage.getHistory()
 		history.push uri
-		GM_setValue 'history', JSON.stringify history
-	@clearHistory  : -> GM_setValue('history', '[]')
+		localStorage.setItem 'history', JSON.stringify history
+	@clearHistory  : -> localStorage.setItem('history', '[]')
+	@clear         : -> localStorage.clear()
 
 ###
 # Update the user interface, draw global stats, local stats, timeToNext, app state
@@ -86,6 +87,9 @@ class UI
 		$('.btn.clear-history').click () ->
 			GM_Storage.clearHistory()
 			self.update()
+		$('.btn.clear-client-stats').click () -> 
+			GM_Storage.clear()
+			self.update()
 		@reset()
 	
 	updateServerStats : (cb) ->
@@ -93,8 +97,8 @@ class UI
 			$('.server-status .status-' + k).html v
 
 		$('#leaderboard tbody').empty()
-		rankedUsers = [k of @app.leaderboard].sort (a,b) -> a.files > b.files
-		for user in rankedUsers
+		users = Object.keys(@app.leaderboard).sort (a,b) -> a.files > b.files
+		for user in users
 			{files,bytes} = @app.leaderboard[user]
 			$('#leaderboard tbody').append """
 			<tr>
@@ -186,7 +190,7 @@ class App
 					cb null, e.response
 				else
 					# console.log e
-					cb 'Wrong statuscode'
+					cb "Wrong statuscode [#{e.response}]"
 				return
 		return
 
@@ -260,7 +264,7 @@ class App
 					@timeToNext = -1
 					@downloadNext()
 			else if @state == STATE.FINISHED_UPLOADING
-				@timeToNext = INTERVAL_WAIT_MS
+				@timeToNext = INTERVAL_WAIT_MS + randomDelay()
 				@changeState STATE.IDLE
 				@ui.resetProgress()
 
@@ -298,7 +302,7 @@ class App
 	_throwError : (msg, err) ->
 		console.log msg
 		console.log err
-		window.alert msg
+		window.alert "#{msg}: #{err}"
 		@changeState STATE.ERROR
 
 	###
@@ -308,7 +312,7 @@ class App
 		self = this
 		self.changeState STATE.DOWNLOADING
 		@requestURI (err, uri) ->
-			return self._throwError("Error retrieving URI", err) if err
+			return self._throwError("No URI retrieved:", err) if err
 			self.ui.setLastURI uri
 			self.downloadFile uri, (err, form, success, length) ->
 				self.changeState STATE.UPLOADING
