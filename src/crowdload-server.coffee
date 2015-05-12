@@ -183,6 +183,30 @@ app.post '/queue', (req, res, next) ->
 			return res.send "Queued uri #{uri}"
 
 ###
+# Reset a URI
+###
+app.post '/queue/reset', (req, res, next) ->
+	uri = req.query.uri
+	md5 = req.query.md5
+	patch = {
+		'$set': {'status': STATUS.QUEUED}
+		'$unset': {'entries': 1}
+	}
+	query = null
+	if not uri and not md5
+		res.status 400
+		return res.send "Must set either 'uri' or 'md5' param for /queue/reset"
+	else if uri
+		query = {_id: uri}
+	else if md5
+		query = {'entries.md5': md5}
+	DB.files.update query, patch, {multi: true}, (err, nrUpdated) ->
+		if err
+			return res.send err
+		else
+			return res.send "Updated #{nrUpdated} documents"
+
+###
 # Dequeue a URI
 ###
 app.post '/queue/pop', (req, res, next) ->
