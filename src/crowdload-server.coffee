@@ -109,8 +109,9 @@ app.set('view engine', 'jade')
 #
 
 _getRemote = (req) ->
-	# req.connection.remoteAddress
-	return req.header 'X-Forwarded-For'
+	ret = req.header 'X-Forwarded-For'
+	ret or= req.connection.remoteAddress
+	return ret
 
 ###
 ==========~~~~~~~---- --- -- -  -   -    -
@@ -250,7 +251,6 @@ app.post '/queue/pop', (req, res, next) ->
 
 app.get '/history', (req, res, next) ->
 	DB.files.find({'entries':{'$exists': 1}}).sort({'entries.date': -1}).limit(10).exec (err, docs) ->
-		console.log docs
 		res.send docs
 
 ###
@@ -289,7 +289,7 @@ app.get '/queue', (req, res, next) ->
 
 _validateForm = (fields, files) ->
 	problems = []
-	for req in ['user', 'date', 'status']
+	for req in ['user', 'status']
 		if req not of fields or fields[req].length == 0
 			problems.push "Missing required '#{req}' form field"
 	if fields.status and parseInt(fields.status[0]) >= 400
@@ -302,12 +302,14 @@ _validateForm = (fields, files) ->
 
 _parseEntry = (req, fields, files) ->
 	obj = {}
-	for fieldName in ['user', 'date', 'status']
-		obj[fieldName] = fields[fieldName][0]
-	obj.date = new Date(obj.date)
+	for fieldName in ['user', 'status']
+		obj[fieldName] = fields[fieldName]?[0]
+	obj.date = new Date()
 	obj.status = parseInt fields.status
 	obj.ip = _getRemote(req)
-	obj.size = files.file[0].size
+	console.log req.connection.remoteAddress
+	if files?.file?[0]
+		obj.size = files.file[0].size
 	return obj
 
 ###
@@ -318,6 +320,7 @@ app.put '/upload', (req, res, next) ->
 	if not uri
 		res.status 400
 		return res.send "Must provide 'uri' query parameter"
+
 	DB.files.findOne {_id: uri}, (err, doc) ->
 		if err
 			res.status 400
@@ -332,19 +335,24 @@ app.put '/upload', (req, res, next) ->
 				if err
 					LOG.error "Unparseable form in request"
 					return next "Unparseable form in request"
+				entry = _parseEntry(req, fields, files)
 				problems = _validateForm(fields, files)
 				if problems.length > 0
-					return DB.files.update {_id: uri}, {'$set': {'status': STATUS.FAILED}}, (err, nrUpdated) ->
+					entry.problems = problems
+					patch = {'$set': {'status': STATUS.FAILED}, '$push': {entries: entry}}
+					LOG.error entry 
+					return DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
 						res.status 400
-						res.end()
-
-				entry = _parseEntry(req, fields, files)
+						res.send patch
 
 				# Calculate MD5, store file in SAVE_DIR
 				if entry.status isnt 200 or not files.file[0]
-					DB.files.update {_id: uri}, {'$set': {'status': STATUS.FAILED}}, (err, nrUpdated) ->
+					entry.problems = ['Expected HTTP status code 200']
+					patch = {'$set': {'status': STATUS.FAILED}, '$push': {entries: entry}}
+					LOG.error entry 
+					DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
 						res.status 400
-						res.end()
+						res.send patch
 				hash = Crypto.createHash 'md5'
 				inFileName = files.file[0].path
 
