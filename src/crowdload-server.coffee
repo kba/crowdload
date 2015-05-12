@@ -19,6 +19,7 @@ Multiparty    = require 'multiparty'
 Winston      = require 'winston'
 ChildProcess = require 'child_process'
 Request      = require 'superagent'
+config       = require __dirname + '/../config.json'
 # Compression = require 'compression'
 
 LOG = new (Winston.Logger) {
@@ -49,7 +50,7 @@ PORT = 2000
 ###
 # BASE_URL
 ###
-BASE_URL = 'http://infolis.gesis.org/crowdload'
+BASE_URL = config.BASE_URL
 
 ###
 # Directory to store the files in
