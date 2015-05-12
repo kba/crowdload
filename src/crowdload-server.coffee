@@ -188,10 +188,8 @@ app.post '/queue', (req, res, next) ->
 app.post '/queue/reset', (req, res, next) ->
 	uri = req.query.uri
 	md5 = req.query.md5
-	patch = {
-		'$set': {'status': STATUS.QUEUED}
-		'$unset': {'entries': 1}
-	}
+	full = req.query.full in ['1', 'true']
+
 	query = null
 	if not uri and not md5
 		res.status 400
@@ -200,6 +198,11 @@ app.post '/queue/reset', (req, res, next) ->
 		query = {_id: uri}
 	else if md5
 		query = {'entries.md5': md5}
+
+	patch = {'$set': {'status': STATUS.QUEUED}}
+	if full
+		LOG.warn "Fully resetting documents matching #{query}"
+		patch['$unset'] = {'entries': 1}
 	DB.files.update query, patch, {multi: true}, (err, nrUpdated) ->
 		if err
 			return res.send err
@@ -214,9 +217,9 @@ app.post '/queue/pop', (req, res, next) ->
 	if not userName
 		return next "Must set 'userName' URI query parameter for /queue/pop"
 	_find_next_link = () ->
-			if @status is STATUS.QUEUED
+			if @status is STATUS.QUEUED and not @entries
 				return true
-			if @status is STATUS.FAILED and @entries and @entries.length > 0
+			else if @status in [STATUS.QUEUED, STATUS.FAILED] and @entries and @entries.length > 0
 				for entry in @entries
 					if entry.user isnt userName
 						return true
