@@ -110,6 +110,7 @@ class UI
 
 		$('#history tbody').empty()
 		for entry in @app.history
+			console.log entry.entries[0].date
 			$('#history tbody').append """
 				<tr>
 					<td>
@@ -122,7 +123,7 @@ class UI
 						#{entry.entries[0].user}
 					</td>
 					<td>
-						#{entry.entries[0].date}
+						#{moment.duration(moment(entry.entries[0].date)).humanize()}
 					</td>
 				</tr>
 			"""

@@ -3,6 +3,7 @@
 // @namespace   http://infolis.github.io
 // @description browser part of crowdload
 // @require     https://cdnjs.cloudflare.com/ajax/libs/zepto/1.1.4/zepto.js
+// @require     https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.2/moment.min.js
 // @include     {{{BASE_URL}}}/*
 // @downloadURL {{{BASE_URL}}}/Crowdload.user.js
 // @updateURL   {{{BASE_URL}}}/Crowdload.meta.js
