@@ -126,11 +126,16 @@ app.get '/', (req, res, next) ->
 
 _getUserScriptMeta = (cb) ->
 	Fs.readFile 'templates/Crowdload.meta.js', {encoding:'utf-8'}, (err, meta) ->
-		meta = meta.replace 'CURRENT_DATE', Moment().format('YYYYMMDDHHmmss')
-		meta = meta.replace /BASE_URL/g, BASE_URL
+		meta = meta.replace '{{{CURRENT_DATE}}}', Moment().format('YYYYMMDDHHmmss')
+		meta = meta.replace /{{{BASE_URL}}}/g, BASE_URL
 		meta = meta.replace /^/g, '// '
 		meta = meta.replace /\n/g, '\n// '
 		return cb meta
+
+_getUserScriptCode = (cb) ->
+	ChildProcess.exec 'coffee -pbc templates/Crowdload.user.coffee', (err, script) ->
+		script = script.replace('{{{BASE_URL}}}', BASE_URL)
+		return cb script
 
 ###
 # User script metadata
@@ -142,8 +147,7 @@ app.get '/Crowdload.meta.js', (req, res, next) ->
 # User script source code
 ###
 app.get '/Crowdload.user.js', (req, res, next) ->
-	# childprocess spawnsync
-	ChildProcess.exec 'coffee -pbc templates/Crowdload.user.coffee', (err, script) ->
+	_getUserScriptCode (script) ->
 		_getUserScriptMeta (meta) ->
 			res.header 'Content-Type', 'text/javascript'
 			res.send meta + '\n' + script

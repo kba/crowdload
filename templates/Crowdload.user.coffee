@@ -16,8 +16,9 @@ STATE = {'STOPPED', 'IDLE', 'DOWNLOADING', 'UPLOADING', 'FINISHED_UPLOADING', 'E
 
 ###
 # Base URL of the orchestrator
+# -- Injected by the script. It's a hack.
 ###
-CROWDLOAD_BASE = 'http://infolis.gesis.org/crowdload'
+CROWDLOAD_BASE = "{{{BASE_URL}}}"
 
 ###
 # How many milliseconds to wait between requests
