@@ -53,6 +53,15 @@ humanReadableSeconds = (seconds) ->
 randomDelay = () ->
 	Math.round Math.random() * (40 * 1000)
 
+_parseHeaders = (str) ->
+	ret = {}
+	for line in str.split(/\n/)
+		colonIndex = line.indexOf(':')
+		k = line.substr(0, colonIndex).trim().toLowerCase()
+		v = line.substr(colonIndex + 1).trim()
+		ret[k] = v
+	return ret
+
 ###
 # Store data locally in browser
 ###
@@ -235,7 +244,8 @@ class App
 				console.log 'Finished downloading PDF'
 				form.append("date", new Date())
 				form.append("status", e.status)
-				if e.status == 200
+				headers = _parseHeaders e.responseHeaders
+				if e.status == 200 and headers['content-type'] is 'application/pdf'
 					console.log 'PDF Download successful'
 					form.append("file", new Blob([e.response], {type: e.responseHeaders['Content-Type']}))
 					###
