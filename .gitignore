@@ -33,4 +33,4 @@ lib/
 *nedb
 *csv
 public/vendor
-config.json
+/config.json
