@@ -26,9 +26,9 @@ CROWDLOAD_BASE = "{{{BASE_URL}}}"
 INTERVAL_WAIT_MS = 30 * 1000
 
 ###
-# Update the application every 50ms
+# Update the application every 1000ms
 ###
-INTERVAL_CLIENT_UPDATE_MS = 50
+INTERVAL_CLIENT_UPDATE_MS = 1000
 
 ###
 # jQuery-like selector
@@ -48,7 +48,7 @@ humanReadableSize = (bytes) ->
 
 
 humanReadableSeconds = (seconds) ->
-	(seconds / 1000.0).toFixed(2) + ' s'
+	(seconds / 1000.0).toFixed(0) + ' s'
 
 randomDelay = () ->
 	Math.round Math.random() * (40 * 1000)
