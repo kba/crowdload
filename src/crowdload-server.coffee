@@ -201,8 +201,9 @@ app.post '/queue/reset', (req, res, next) ->
 
 	patch = {'$set': {'status': STATUS.QUEUED}}
 	if full
-		LOG.warn "Fully resetting documents matching #{query}"
+		LOG.warn "FULLY resetting documents matching #{query}"
 		patch['$unset'] = {'entries': 1}
+	LOG.warn "Resetting documents matching #{query}"
 	DB.files.update query, patch, {multi: true}, (err, nrUpdated) ->
 		if err
 			return res.send err
