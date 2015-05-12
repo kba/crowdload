@@ -129,8 +129,6 @@ _getUserScriptMeta = (cb) ->
 	Fs.readFile 'templates/Crowdload.meta.js', {encoding:'utf-8'}, (err, meta) ->
 		meta = meta.replace '{{{CURRENT_DATE}}}', Moment().format('YYYYMMDDHHmmss')
 		meta = meta.replace /{{{BASE_URL}}}/g, BASE_URL
-		meta = meta.replace /^/g, '// '
-		meta = meta.replace /\n/g, '\n// '
 		return cb meta
 
 _getUserScriptCode = (cb) ->
