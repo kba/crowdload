@@ -216,11 +216,12 @@ app.post '/queue/pop', (req, res, next) ->
 
 ###
 # History
-# TODO
 ###
 
-# app.get '/history', (req, res, next) ->
-#     DB.files.find({}).sort('entries.
+app.get '/history', (req, res, next) ->
+	DB.files.find({'entries':{'$exists': 1}}).sort({'entries.date': -1}).limit(10).exec (err, docs) ->
+		console.log docs
+		res.send docs
 
 ###
 # Get leaderboard :)

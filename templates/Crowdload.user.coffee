@@ -64,12 +64,6 @@ class GM_Storage
 	@setLastURI    : (uri) -> return localStorage.setItem 'last_uri', uri
 	@getUserName   : -> return localStorage.getItem('userName')
 	@setUserName   : (name) -> return localStorage.setItem('userName', name)
-	@getHistory    : -> return JSON.parse localStorage.getItem('history') or '[]'
-	@addToHistory  : (uri) ->
-		history = GM_Storage.getHistory()
-		history.push uri
-		localStorage.setItem 'history', JSON.stringify history
-	@clearHistory  : -> localStorage.setItem('history', '[]')
 	@clear         : -> localStorage.clear()
 
 ###
@@ -84,9 +78,7 @@ class UI
 		$('.btn.start').click () -> self.app.start()
 		$('.btn.stop').click () -> self.app.stop()
 		$('.btn.refresh-stats').click () -> self.app.updateServerStats()
-		$('.btn.clear-history').click () ->
-			GM_Storage.clearHistory()
-			self.update()
+		$('.btn.clear-history').click () -> self.app.updateServerStats()
 		$('.btn.clear-client-stats').click () -> 
 			GM_Storage.clear()
 			self.update()
@@ -97,15 +89,32 @@ class UI
 			$('.server-status .status-' + k).html v
 
 		$('#leaderboard tbody').empty()
-		users = Object.keys(@app.leaderboard).sort (a,b) -> a.files > b.files
-		for user in users
-			{files,bytes} = @app.leaderboard[user]
+		sortedBoard = ([k,v] for k,v of @app.leaderboard).sort (a,b) -> b[1].files - a[1].files
+		for row in sortedBoard
 			$('#leaderboard tbody').append """
 			<tr>
-				<th>#{user}</th>
-				<td>#{humanReadableSize bytes}</td>
-				<td>#{files}</td>
+				<th>#{row[0]}</th>
+				<td>#{row[1].files}</td>
 			</tr>
+			"""
+
+		$('#history tbody').empty()
+		for entry in @app.history
+			$('#history tbody').append """
+				<tr>
+					<td>
+						<a href='#{entry._id}'>#{entry._id}</a>
+					</td>
+					<td class='alert-#{if entry.status is 'FINISHED' then 'success' else 'danger'}'>
+						#{entry.status}
+					</td>
+					<td>
+						#{entry.entries[0].user}
+					</td>
+					<td>
+						#{entry.entries[0].date}
+					</td>
+				</tr>
 			"""
 
 	update : ->
@@ -121,10 +130,6 @@ class UI
 		$('.client-state').html @app.state
 		$('.client-files-retrieved').html GM_Storage.getFilesCount()
 		$('.client-bytes-retrieved').html humanReadableSize GM_Storage.getBytes()
-
-		$('#history').empty()
-		for uri in GM_Storage.getHistory()
-			$('#history').append "<li><a href='#{uri}'>#{uri}</a></li>"
 
 	###
 	# Reset the User Interface, show the parts that are hidden for non-Userscript,
@@ -286,7 +291,12 @@ class App
 					method: 'GET'
 					onload: (e2) ->
 						self.leaderboard = JSON.parse(e2.response)
-						self.ui.updateServerStats()
+						GM_xmlhttpRequest
+							url: CROWDLOAD_BASE + "/history"
+							method: 'GET'
+							onload: (e3) ->
+								self.history = JSON.parse e3.response
+								self.ui.updateServerStats()
 
 	start : ->
 		@changeState STATE.IDLE
@@ -326,7 +336,6 @@ class App
 							GM_Storage.incFilesCount()
 							GM_Storage.incBytes length
 						self.changeState STATE.FINISHED_UPLOADING
-						GM_Storage.addToHistory uri
 						self.updateServerStats()
 					return
 				return

@@ -86,7 +86,7 @@ html
 								thead
 									tr
 										th User
-										th Data
+										//- th Data
 										th Files
 								tbody
 			.row.userscript
@@ -95,4 +95,11 @@ html
 						.panel-heading History
 							button.btn.btn-xs.btn-default.pull-right.clear-history Clear
 						.panel-body
-							ul#history
+							table.table.table-condensed#history
+								thead
+									tr
+										th URI
+										th Status
+										th User
+										th Date
+								tbody
