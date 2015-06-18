@@ -3,6 +3,7 @@
   "version": "0.0.2",
   "description": "Crowdsource downloads",
   "scripts": {
+    "serve": "nodemon src/crowdload-server.coffee",
     "test": "coffee test/*.coffee | tap-spec",
     "docs": "docker -i src -o apidocs -s -n -c vs",
     "compile": "coffee -c -o lib src",

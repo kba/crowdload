@@ -110,7 +110,6 @@ class UI
 
 		$('#history tbody').empty()
 		for entry in @app.history
-			console.log entry.entries[0].date
 			$('#history tbody').append """
 				<tr>
 					<td>
@@ -123,7 +122,8 @@ class UI
 						#{entry.entries[0].user}
 					</td>
 					<td>
-						#{moment.duration(moment(entry.entries[0].date)).humanize()}
+						<!-- #{moment.duration(moment(entry.entries[0].date)).humanize()} -->
+						#{entry.entries[0].date}
 					</td>
 				</tr>
 			"""
@@ -189,6 +189,7 @@ class App
 		@update()
 
 	changeState : (state) ->
+		console.log "Change state: #{@state} -> #{state}"
 		@state = state
 		@ui.update()
 
@@ -243,19 +244,33 @@ class App
 				return self.ui.setProgress 'Download', e
 			onload: (e) ->
 				console.log 'Finished downloading PDF'
+				responseText = e.responseText
+				console.log "RESPONSETEXT: " + responseText
+				responseLength = responseText.length
+				console.log "LENGTH: " + responseLength
+				console.log "It is #{responseLength} bytes long"
 				form.append("date", new Date())
 				form.append("status", e.status)
+				console.log "Parsing headers"
 				headers = _parseHeaders e.responseHeaders
 				if e.status == 200 and headers['content-type'] is 'application/pdf'
 					console.log 'PDF Download successful'
-					form.append("file", new Blob([e.response], {type: e.responseHeaders['Content-Type']}))
-					###
-					###
-					# form.append("file", [e.responseText])
+					blob = new Blob([e.response], {type: headers['content-type']})
+					console.log 'Created Blob from PDF'
+					form.append("file", blob)
+					console.log 'appended to form'
 					success = true
 				else
-					form.append("reason", e.responseText)
-				return cb null, form, success, e.response.length
+					console.log "Trying to find link to PDF in response"
+					if responseText
+						match = /iframe id="pdfDocument" src="([^"]+)"/.exec(responseText)
+						if match and match[1]
+							console.log "Deep link pattern matched #{match[1]}"
+							return self.downloadFile match[1], cb
+						form.append("reason", responseText)
+					console.log "Failed to find a link, download failed finally."
+				console.log 'Mopping up downloadFile function'
+				return cb null, form, success, responseLength
 
 	###
 	#

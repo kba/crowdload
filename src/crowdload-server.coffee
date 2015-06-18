@@ -25,9 +25,9 @@ config       = require __dirname + '/../config.json'
 LOG = new (Winston.Logger) {
 	transports: [
 		new Winston.transports.DailyRotateFile {
-			filename: 'crowdload.log'
+			filename: 'log/crowdload'
 			level: 'silly'
-			datePattern: '.yyyy-MM-dd'
+			datePattern: '.yyyy-MM-dd.log'
 			json: on
 			prettyPrint: true
 			depth: 2
@@ -170,6 +170,7 @@ app.post '/queue', (req, res, next) ->
 		return res.send "Must provide 'uri' query parameter"
 	doc = {
 		'_id': uri
+		'downloadURI': uri
 		'added': new Date()
 		'status': STATUS.QUEUED
 	}
@@ -236,7 +237,10 @@ app.post '/queue/pop', (req, res, next) ->
 			res.status 404
 			res.send 'No more URIs to fetch (for you)'
 		else
-			LOG.debug "Giving URI <#{doc._id}> to user '#{userName}' [#{_getRemote(req)}]"
+			downloadURI = doc._id
+			if doc.downloadURI
+				downloadURI = doc.downloadURI
+			LOG.debug "Giving URI <#{downloadURI}> to user '#{userName}' [#{_getRemote(req)}]"
 			patch = '$set': {status: STATUS.ACCEPTED}
 			DB.files.update {_id: doc._id}, patch, (err) ->
 				if err
@@ -244,7 +248,7 @@ app.post '/queue/pop', (req, res, next) ->
 					next err
 				else
 					res.status 200
-					res.send doc._id
+					res.send downloadURI
 
 ###
 # History
@@ -308,7 +312,6 @@ _parseEntry = (req, fields, files) ->
 	obj.date = new Date()
 	obj.status = parseInt fields.status
 	obj.ip = _getRemote(req)
-	console.log req.connection.remoteAddress
 	if files?.file?[0]
 		obj.size = files.file[0].size
 	return obj
@@ -322,13 +325,14 @@ app.put '/upload', (req, res, next) ->
 		res.status 400
 		return res.send "Must provide 'uri' query parameter"
 
-	DB.files.findOne {_id: uri}, (err, doc) ->
+	DB.files.findOne {'$or': [{_id: uri}, {downloadURI: uri}]}, (err, doc) ->
 		if err
 			res.status 400
 			LOG.error err
 			next err
 		else if not doc
 			res.status 404
+			LOG.error "Posting of unknown URI <#{uri}>"
 			next "Unknown URI <#{uri}> ."
 		else
 			form = new Multiparty.Form()
@@ -341,7 +345,7 @@ app.put '/upload', (req, res, next) ->
 				if problems.length > 0
 					entry.problems = problems
 					patch = {'$set': {'status': STATUS.FAILED}, '$push': {entries: entry}}
-					LOG.error entry 
+					LOG.error entry
 					return DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
 						res.status 400
 						res.send patch
@@ -350,8 +354,8 @@ app.put '/upload', (req, res, next) ->
 				if entry.status isnt 200 or not files.file[0]
 					entry.problems = ['Expected HTTP status code 200']
 					patch = {'$set': {'status': STATUS.FAILED}, '$push': {entries: entry}}
-					LOG.error entry 
-					DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
+					LOG.error entry
+					DB.files.update {_id: doc._id}, patch, (err, nrUpdated) ->
 						res.status 400
 						res.send patch
 				hash = Crypto.createHash 'md5'
@@ -379,7 +383,7 @@ app.put '/upload', (req, res, next) ->
 						patch = {'$set': {}}
 						patch['$push'] = {entries: entry}
 						patch['$set'].status = STATUS.FINISHED
-						DB.files.update {_id: uri}, patch, (err, nrUpdated) ->
+						DB.files.update {_id: doc._id}, patch, (err, nrUpdated) ->
 							if err
 								res.status 400
 								res.end()
